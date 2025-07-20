@@ -1,0 +1,11 @@
+{
+	"id": "attachment-downloader",
+	"name": "Attachment Downloader",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Automatically download note attachments via Git LFS.",
+	"author": "Obsidian",
+	"authorUrl": "https://github.com/hnidesu/attachment-downloader",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+}
