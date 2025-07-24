@@ -5,7 +5,7 @@
 	"minAppVersion": "0.15.0",
 	"description": "Automatically download note attachments via Git LFS.",
 	"author": "Obsidian",
-	"authorUrl": "https://github.com/hnidesu/attachment-downloader",
+	"authorUrl": "https://github.com/HNIdesu",
 	"fundingUrl": "",
 	"isDesktopOnly": false
 }
