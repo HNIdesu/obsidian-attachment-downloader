@@ -96,6 +96,7 @@ export default class MeidaDownloaderPlugin extends Plugin {
     onunload() {
         this.removeCommand("download-all-attachments")
         this.app.workspace.off("file-open", this._onFileOpen!)
+        this.abortController?.abort()
         this._onFileOpen = null
     }
 
