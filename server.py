@@ -38,7 +38,7 @@ parser.add_argument("note_directory", type=str)
 parser.add_argument("--bind-address", default="127.0.0.1", type=str, required=False)
 parser.add_argument("--port", default=3322, type=int, required=False)
 parser.add_argument("--dry-run", action="store_true",default=False,required=False)
-parser.add_argument("--verbose")
+parser.add_argument("--verbose", action="store_true",default=False,required=False)
 args = parser.parse_args()
 note_directory = p.abspath(args.note_directory)
 
