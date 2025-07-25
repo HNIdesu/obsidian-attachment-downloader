@@ -1,103 +1,112 @@
-import { MarkdownView, Plugin, TFile } from 'obsidian';
+import { Platform, Plugin, TFile } from 'obsidian';
 import { MySettingTab } from './settings'
 interface MyPluginSettings {
     hostName: string
     port: number
-    batchSize: number
-    downloadMode: string
 }
 
 const DEFAULT_SETTINGS: Partial<MyPluginSettings> = {
     hostName: "127.0.0.1",
-    port: 3322,
-    batchSize: 5,
-    downloadMode: "auto"
+    port: 3322
+}
+
+class MediaUrl {
+    hostname: string
+    protocol: string
+    vaultDirectory: string
+    mediaPath: string
+    lastModifiedTime: number
+    hash: string
+    private MediaUrl() { }
+    static parse(urlStr: string | undefined | null, vaultDirectory: string): MediaUrl {
+        const result = new MediaUrl()
+        const url = new URL(urlStr!)
+        result.protocol = url.protocol
+        result.hostname = url.hostname
+        result.vaultDirectory = vaultDirectory
+        if (Platform.isMobileApp) {
+            const regex = new RegExp(`/_capacitor_file_${vaultDirectory}/(.+)`, "g")
+            const matchResult = regex.exec(url.pathname)
+            result.mediaPath = matchResult![1]
+            result.lastModifiedTime = 0
+        } else {
+            const regex = new RegExp(`/${vaultDirectory}/(.+)`, "g")
+            const matchResult = regex.exec(url.pathname)
+            result.mediaPath = matchResult![1]
+            result.lastModifiedTime = parseInt(url.search.substring(1))
+        }
+        result.hash = url.hash
+        return result
+    }
+    toString() {
+        return Platform.isMobileApp ? `${this.protocol}//${this.hostname}/_capacitor_file_${this.vaultDirectory}/${this.mediaPath}?${this.lastModifiedTime}${this.hash}` :
+            `${this.protocol}//${this.hostname}/${this.vaultDirectory}/${this.mediaPath}?${this.lastModifiedTime}${this.hash}`
+    }
 }
 
 export default class MeidaDownloaderPlugin extends Plugin {
     private _onFileOpen: ((file: TFile | null) => any) | null = null;
     private abortController: AbortController | null = null
     settings: MyPluginSettings;
-
-    private async downloadAllAttachments(plugin: MeidaDownloaderPlugin, file: TFile) {
-        plugin.abortController?.abort()
-        const controller = new AbortController()
-        plugin.abortController = controller
-        const markdownView = plugin.app.workspace.getActiveViewOfType(MarkdownView)
-        const notePath = file.path
-        const content = await plugin.app.vault.cachedRead(file)
-        const regExp = new RegExp("!\\[([^\\]]*)\\]\\(([^\\)]*)\\)", "g")
-        const urlCollection = []
-        for (const match of content.matchAll(regExp)) {
-            let url = match[2]
-            if (url.trim() == "" || url.contains("\\")) continue
-            url = url.trim().replace("%20", " ")
-            if (!url.startsWith("attachments/"))
-                url = "attachments/" + url
-            urlCollection.push(url)
-        }
-        const batchSize = plugin.settings.batchSize
-        let start = 0
-        while (true) {
-            const urls = urlCollection.slice(start, start + batchSize)
-            if (urls.length == 0) break
-            try {
-                const res = await fetch(`http://${plugin.settings.hostName}:${plugin.settings.port}/pull-lfs`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        note: notePath,
-                        resources: urls
-                    }),
-                    signal: controller.signal
-                })
-                if (res.status == 200) {
-                    const results = await res.json() as Array<number>
-                    if (results.contains(0))
-                        markdownView?.previewMode?.rerender(true)
-                }
-
-            } catch (ex) {
-                if (ex.name == "AbortError") {
-                    break
-                }
-            }
-            start += urls.length
-        }
-    }
+    private observer: MutationObserver | null
 
     async onload() {
         const plugin: MeidaDownloaderPlugin = this
-        this.addCommand({
-            id: "download-all-attachments",
-            name: "Download All Attachments",
-            checkCallback: (checking) =>{
-                const markdownView = plugin.app.workspace.getActiveViewOfType(MarkdownView)
-                const previewMode = markdownView?.previewMode?.containerEl?.style?.display === ""
-                const file = markdownView?.file
-                if (previewMode && file) {
-                    if (!checking)
-                        plugin.downloadAllAttachments(plugin, file);
-                    return true;
+        this._onFileOpen = _ => {
+            plugin.observer?.disconnect()
+            plugin.abortController?.abort()
+            const controller = new AbortController()
+            plugin.observer = new MutationObserver(records => {
+                for (const record of records) {
+                    for (let i = 0; i < record.addedNodes.length; i++) {
+                        const node = record.addedNodes[i]
+                        if (node.nodeName == "IMG" || node.nodeName == "AUDIO" || node.nodeName == "VIDEO") {
+                            const vaultDirectory: string = (plugin.app.vault.adapter as any).basePath.replaceAll("\\", "/") // directory of the vault
+                            const link = (node as Element).getAttribute("src")
+                            let url: MediaUrl
+                            try {
+                                url = MediaUrl.parse(link, vaultDirectory)
+                            } catch (ex) {
+                                continue
+                            }
+                            fetch(`http://${plugin.settings.hostName}:${plugin.settings.port}/pull-lfs`, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json"
+                                },
+                                body: JSON.stringify({
+                                    resources: [url.mediaPath]
+                                }),
+                                signal: controller.signal
+                            }).then(res => res.json()).then(json => {
+                                const lastModifiedTime = json[0] as number
+                                if (lastModifiedTime != url.lastModifiedTime) {
+                                    url.lastModifiedTime = lastModifiedTime;
+                                    (node as Element).setAttribute("src", url.toString())
+                                }
+                            }).catch(err => {
+                                console.error(err)
+                            })
+                        }
+                    }
                 }
-                return false;
-            },
-        })
-        this._onFileOpen = (file: TFile | null) => {
-            if (plugin.settings.downloadMode != "auto") return
-            if (file != null) plugin.downloadAllAttachments(plugin, file)
-        };
+            })
+            plugin.abortController = controller
+        }
         this.app.workspace.on("file-open", this._onFileOpen)
+        this.registerMarkdownPostProcessor((e) => {
+            plugin.observer?.observe(e, {
+                childList: true,
+                subtree: true
+            })
+        });
         await this.loadSettings()
         this.addSettingTab(new MySettingTab(this.app, this))
     }
     onunload() {
-        this.removeCommand("download-all-attachments")
+        this.observer?.disconnect()
         this.app.workspace.off("file-open", this._onFileOpen!)
         this.abortController?.abort()
-        this._onFileOpen = null
     }
 
     async loadSettings() {

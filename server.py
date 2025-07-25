@@ -48,33 +48,16 @@ class MyHandler(BaseHTTPRequestHandler):
             user_agent = self.headers.get('User-Agent', "")
             body = self.rfile.read(content_length)
             data = json.loads(body.decode(encoding="utf-8"))
-            note_path = data["note"]
-            logger.log(f"Processing note path: {note_path}")
-            result = []
-            
-            for resource_path in data["resources"]:
-                logger.debug(f"Adding resource {resource_path} to task queue")
-                logger.debug(f"Task fetched: note_path={note_path}, resource_path={resource_path}")
-                args1 = [
-                    "git","lfs","pull","--include",",".join(data["resources"])
-                ]
-                last_modified_time = os.stat(p.join(note_directory,resource_path)).st_mtime
-                if args.dry_run:
-                    args1.insert(0,"echo")
-                res = subprocess.run(
-                    args=args1,
-                    cwd=note_directory
-                )
-                if res.returncode == 0:
-                    logger.log(f"Completed pulling LFS file for {resource_path}")
-                    if os.stat(p.join(note_directory,resource_path)).st_mtime != last_modified_time:
-                        res_code = 0
-                    else:
-                        res_code = 1
-                else:
-                    logger.error(f"Failed to pull LFS file for {resource_path}")
-                    res_code = 2
-                result.append(res_code)
+            args1 = [
+                "git","lfs","pull","--include",",".join(data["resources"])
+            ]
+            if args.dry_run:
+                args1.insert(0,"echo")
+            subprocess.run(
+                args=args1,
+                cwd=note_directory
+            )
+            result = [(os.stat(p.join(note_directory,resource_path)).st_mtime_ns // 1000000) for resource_path in data["resources"]]
             self.send_response(200)
             if "Android" in user_agent:
                 self.send_header('Access-Control-Allow-Origin', 'http://localhost') # Mobile
