@@ -36,6 +36,20 @@ export class MySettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     })
             );
+        new Setting(containerEl)
+            .setName("Attachment Download Mode")
+            .setDesc("Choose whether attachments are downloaded automatically or manually.")
+            .addDropdown(comp => {
+                comp.addOptions({
+                        "auto": "Auto",
+                        "mannual": "Mannual"
+                    })
+                    .setValue(this.plugin.settings.downloadMode)
+                    .onChange(async (value) => {
+                        this.plugin.settings.downloadMode = value;
+                        await this.plugin.saveSettings();
+                    })
+            });
     }
 
 }

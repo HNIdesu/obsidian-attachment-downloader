@@ -1,8 +1,9 @@
-import { Platform, Plugin, TFile } from 'obsidian';
+import { MarkdownView, Platform, Plugin, TFile } from 'obsidian';
 import { MySettingTab } from './settings'
 interface MyPluginSettings {
     hostName: string
     port: number
+    downloadMode: string
 }
 class MediaEntry {
     element: Element
@@ -77,7 +78,8 @@ class Session {
 
 const DEFAULT_SETTINGS: Partial<MyPluginSettings> = {
     hostName: "127.0.0.1",
-    port: 3322
+    port: 3322,
+    downloadMode: "auto"
 }
 
 class MediaUrl {
@@ -121,6 +123,21 @@ export default class MeidaDownloaderPlugin extends Plugin {
     settings: MyPluginSettings;
     async onload() {
         const plugin: MeidaDownloaderPlugin = this
+        this.addCommand({
+            id: "download-all-attachments",
+            name: "Download All Attachments",
+            checkCallback: (checking) =>{
+                const markdownView = plugin.app.workspace.getActiveViewOfType(MarkdownView)
+                const previewMode = markdownView?.previewMode?.containerEl?.style?.display === ""
+                const file = markdownView?.file
+                if (previewMode && file) {
+                    if (!checking)
+                        plugin._session?.loadMedia()
+                    return true;
+                }
+                return false;
+            },
+        })
         this._onFileOpen = file => {
             if (file === null) return
             plugin._session?.destroy()
@@ -128,20 +145,21 @@ export default class MeidaDownloaderPlugin extends Plugin {
             let lastEntryCount = 0
             if (plugin._timer)
                 clearInterval(plugin._timer)
-            plugin._timer = setInterval(() => {
-                const length = plugin._session?.mediaList.length
-                if (length !== undefined) {
-                    if (length <= lastEntryCount) {
+            if (plugin.settings.downloadMode == "auto")
+                plugin._timer = setInterval(() => {
+                    const length = plugin._session?.mediaList.length
+                    if (length !== undefined) {
+                        if (length <= lastEntryCount) {
+                            clearInterval(plugin._timer!)
+                            plugin._timer = null
+                            plugin?._session?.loadMedia()
+                        } else
+                            lastEntryCount = length
+                    } else{
                         clearInterval(plugin._timer!)
                         plugin._timer = null
-                        plugin?._session?.loadMedia()
-                    } else
-                        lastEntryCount = length
-                } else{
-                    clearInterval(plugin._timer!)
-                    plugin._timer = null
-                }
-            }, 1000)
+                    }
+                }, 1000)
         }
         this.app.workspace.on("file-open", this._onFileOpen)
         this.registerMarkdownPostProcessor((e) => {
