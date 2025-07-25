@@ -4,19 +4,32 @@ interface MyPluginSettings {
     hostName: string
     port: number
 }
+class MediaEntry {
+    element: Element
+    url: MediaUrl
+    constructor(element: Element, url: MediaUrl) {
+        this.element = element
+        this.url = url
+    }
+}
 class Session {
     file: TFile
     abortController: AbortController
     observer: MutationObserver
+    mediaList: Array<MediaEntry>
+    plugin: MeidaDownloaderPlugin
     constructor(plugin: MeidaDownloaderPlugin, file: TFile) {
+        this.plugin = plugin
         this.file = file
         const controller = new AbortController()
         this.abortController = controller
+        const mediaList = new Array<MediaEntry>()
+        this.mediaList = mediaList
         this.observer = new MutationObserver(records => {
             for (const record of records) {
                 for (let i = 0; i < record.addedNodes.length; i++) {
                     const node = record.addedNodes[i]
-                    if (node.nodeName == "IMG" || node.nodeName == "AUDIO" || node.nodeName == "VIDEO") {
+                    if (node.nodeName === "IMG" || node.nodeName === "AUDIO" || node.nodeName === "VIDEO") {
                         const vaultDirectory: string = (plugin.app.vault.adapter as any).basePath.replaceAll("\\", "/") // directory of the vault
                         const link = (node as Element).getAttribute("src")
                         let url: MediaUrl
@@ -25,27 +38,35 @@ class Session {
                         } catch (ex) {
                             continue
                         }
-                        fetch(`http://${plugin.settings.hostName}:${plugin.settings.port}/pull-lfs`, {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json"
-                            },
-                            body: JSON.stringify({
-                                resources: [url.mediaPath]
-                            }),
-                            signal: controller.signal
-                        }).then(res => res.json()).then(json => {
-                            const lastModifiedTime = json[0] as number
-                            if (lastModifiedTime != url.lastModifiedTime) {
-                                url.lastModifiedTime = lastModifiedTime;
-                                (node as Element).setAttribute("src", url.toString())
-                            }
-                        }).catch(err => {
-                            console.error(err)
-                        })
+                        mediaList.push(new MediaEntry((node as Element), url))
                     }
                 }
             }
+        })
+    }
+    loadMedia() {
+        const mediaList = this.mediaList
+        if (mediaList.length == 0) return
+        fetch(`http://${this.plugin.settings.hostName}:${this.plugin.settings.port}/pull-lfs`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                resources: mediaList.map(it => it.url.mediaPath)
+            }),
+            signal: this.abortController.signal
+        }).then(res => res.json()).then(json => {
+            for (let i = 0; i < mediaList.length; i++) {
+                const lastModifiedTime = json[i] as number
+                const entry = mediaList[i]
+                if (lastModifiedTime != entry.url.lastModifiedTime) {
+                    entry.url.lastModifiedTime = lastModifiedTime;
+                    entry.element.setAttribute("src", entry.url.toString())
+                }
+            }
+        }).catch(err => {
+            console.error(err)
         })
     }
     destroy() {
@@ -66,7 +87,7 @@ class MediaUrl {
     mediaPath: string
     lastModifiedTime: number
     hash: string
-    private MediaUrl() { }
+    private constructor() { }
     static parse(urlStr: string | undefined | null, vaultDirectory: string): MediaUrl {
         const result = new MediaUrl()
         const url = new URL(urlStr!)
@@ -96,13 +117,31 @@ class MediaUrl {
 export default class MeidaDownloaderPlugin extends Plugin {
     private _onFileOpen: ((file: TFile | null) => any)
     private _session: Session | null = null
+    private _timer: NodeJS.Timer | null = null
     settings: MyPluginSettings;
     async onload() {
         const plugin: MeidaDownloaderPlugin = this
         this._onFileOpen = file => {
-            if (file == null) return
+            if (file === null) return
             plugin._session?.destroy()
             plugin._session = new Session(plugin, file)
+            let lastEntryCount = 0
+            if (plugin._timer)
+                clearInterval(plugin._timer)
+            plugin._timer = setInterval(() => {
+                const length = plugin._session?.mediaList.length
+                if (length !== undefined) {
+                    if (length <= lastEntryCount) {
+                        clearInterval(plugin._timer!)
+                        plugin._timer = null
+                        plugin?._session?.loadMedia()
+                    } else
+                        lastEntryCount = length
+                } else{
+                    clearInterval(plugin._timer!)
+                    plugin._timer = null
+                }
+            }, 1000)
         }
         this.app.workspace.on("file-open", this._onFileOpen)
         this.registerMarkdownPostProcessor((e) => {
