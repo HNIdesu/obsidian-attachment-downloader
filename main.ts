@@ -99,20 +99,21 @@ class MediaUrl {
         if (Platform.isMobileApp) {
             const regex = new RegExp(`/_capacitor_file_${vaultDirectory}/(.+)`, "g")
             const matchResult = regex.exec(url.pathname)
-            result.mediaPath = matchResult![1]
+            result.mediaPath = decodeURIComponent(matchResult![1])
             result.lastModifiedTime = 0
         } else {
             const regex = new RegExp(`/${vaultDirectory}/(.+)`, "g")
             const matchResult = regex.exec(url.pathname)
-            result.mediaPath = matchResult![1]
+            result.mediaPath = decodeURIComponent(matchResult![1])
             result.lastModifiedTime = parseInt(url.search.substring(1))
         }
         result.hash = url.hash
         return result
     }
     toString() {
-        return Platform.isMobileApp ? `${this.protocol}//${this.hostname}/_capacitor_file_${this.vaultDirectory}/${this.mediaPath}?${this.lastModifiedTime}${this.hash}` :
-            `${this.protocol}//${this.hostname}/${this.vaultDirectory}/${this.mediaPath}?${this.lastModifiedTime}${this.hash}`
+        return Platform.isMobileApp ?
+            `${this.protocol}//${this.hostname}/_capacitor_file_${this.vaultDirectory}/${encodeURIComponent(this.mediaPath)}?${this.lastModifiedTime}${this.hash}` :
+            `${this.protocol}//${this.hostname}/${this.vaultDirectory}/${encodeURIComponent(this.mediaPath)}?${this.lastModifiedTime}${this.hash}`
     }
 }
 
@@ -126,7 +127,7 @@ export default class MeidaDownloaderPlugin extends Plugin {
         this.addCommand({
             id: "download-all-attachments",
             name: "Download All Attachments",
-            checkCallback: (checking) =>{
+            checkCallback: (checking) => {
                 const markdownView = plugin.app.workspace.getActiveViewOfType(MarkdownView)
                 const previewMode = markdownView?.previewMode?.containerEl?.style?.display === ""
                 const file = markdownView?.file
@@ -155,7 +156,7 @@ export default class MeidaDownloaderPlugin extends Plugin {
                             plugin?._session?.loadMedia()
                         } else
                             lastEntryCount = length
-                    } else{
+                    } else {
                         clearInterval(plugin._timer!)
                         plugin._timer = null
                     }
