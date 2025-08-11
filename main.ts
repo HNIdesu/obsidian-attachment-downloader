@@ -19,6 +19,7 @@ class Session {
     observer: MutationObserver
     mediaList: Array<MediaEntry>
     plugin: MeidaDownloaderPlugin
+    isLoading = false
     constructor(plugin: MeidaDownloaderPlugin, file: TFile) {
         this.plugin = plugin
         this.file = file
@@ -46,8 +47,13 @@ class Session {
         })
     }
     loadMedia() {
+        if (this.isLoading) {
+            console.warn("Media is already loading. Please wait...");
+            return
+        }
         const mediaList = this.mediaList
         if (mediaList.length == 0) return
+        this.isLoading = true
         fetch(`http://${this.plugin.settings.hostName}:${this.plugin.settings.port}/pull-lfs`, {
             method: "POST",
             headers: {
@@ -68,6 +74,8 @@ class Session {
             }
         }).catch(err => {
             console.error(err)
+        }).finally(() => {
+            this.isLoading = false
         })
     }
     destroy() {
