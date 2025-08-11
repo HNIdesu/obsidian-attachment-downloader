@@ -50,6 +50,17 @@ export class MySettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     })
             });
+        new Setting(containerEl)
+            .setName("Batch Size")
+            .setDesc("Number of attachments processed in a single batch. UI will refresh after each batch completes.")
+            .addText(comp =>
+                comp.setPlaceholder('5')
+                    .setValue(this.plugin.settings.batchSize.toString())
+                    .onChange(async (value) => {
+                        this.plugin.settings.batchSize = parseInt(value);
+                        await this.plugin.saveSettings();
+                    })
+            );
     }
 
 }

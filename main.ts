@@ -3,6 +3,7 @@ import { MySettingTab } from './settings'
 interface MyPluginSettings {
     hostName: string
     port: number
+    batchSize: number
     downloadMode: string
 }
 class MediaEntry {
@@ -46,7 +47,7 @@ class Session {
             }
         })
     }
-    loadMedia() {
+    async loadMedia(batchSize:number) {
         if (this.isLoading) {
             console.warn("Media is already loading. Please wait...");
             return
@@ -54,29 +55,33 @@ class Session {
         const mediaList = this.mediaList
         if (mediaList.length == 0) return
         this.isLoading = true
-        fetch(`http://${this.plugin.settings.hostName}:${this.plugin.settings.port}/pull-lfs`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                resources: mediaList.map(it => it.url.mediaPath)
-            }),
-            signal: this.abortController.signal
-        }).then(res => res.json()).then(json => {
-            for (let i = 0; i < mediaList.length; i++) {
-                const lastModifiedTime = json[i] as number
-                const entry = mediaList[i]
-                if (lastModifiedTime != entry.url.lastModifiedTime) {
-                    entry.url.lastModifiedTime = lastModifiedTime;
-                    entry.element.setAttribute("src", entry.url.toString())
+        for (let i = 0; i < mediaList.length; i += batchSize) {
+            const mediaListChunk = mediaList.slice(i, i + batchSize)
+            await fetch(`http://${this.plugin.settings.hostName}:${this.plugin.settings.port}/pull-lfs`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    resources: mediaListChunk.map(it => it.url.mediaPath)
+                }),
+                signal: this.abortController.signal
+            }).then(res => res.json()).then(json => {
+                for (let i = 0; i < mediaListChunk.length; i++) {
+                    const lastModifiedTime = json[i] as number
+                    const entry = mediaListChunk[i]
+                    if (lastModifiedTime != entry.url.lastModifiedTime) {
+                        entry.url.lastModifiedTime = lastModifiedTime;
+                        entry.element.setAttribute("src", entry.url.toString())
+                    }
                 }
-            }
-        }).catch(err => {
-            console.error(err)
-        }).finally(() => {
-            this.isLoading = false
-        })
+            }).catch(err => {
+                if (err.name === "AbortError")
+                    throw err
+                console.error(err)
+            })
+        }
+        this.isLoading = false
     }
     destroy() {
         this.observer.disconnect()
@@ -87,6 +92,7 @@ class Session {
 const DEFAULT_SETTINGS: Partial<MyPluginSettings> = {
     hostName: "127.0.0.1",
     port: 3322,
+    batchSize: 5,
     downloadMode: "auto"
 }
 
@@ -141,7 +147,7 @@ export default class MeidaDownloaderPlugin extends Plugin {
                 const file = markdownView?.file
                 if (previewMode && file) {
                     if (!checking)
-                        plugin._session?.loadMedia()
+                        plugin._session?.loadMedia(plugin.settings.batchSize)
                     return true;
                 }
                 return false;
@@ -161,7 +167,7 @@ export default class MeidaDownloaderPlugin extends Plugin {
                         if (length <= lastEntryCount) {
                             clearInterval(plugin._timer!)
                             plugin._timer = null
-                            plugin?._session?.loadMedia()
+                            plugin._session?.loadMedia(plugin.settings.batchSize)
                         } else
                             lastEntryCount = length
                     } else {
