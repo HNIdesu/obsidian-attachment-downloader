@@ -5,7 +5,7 @@ A plugin for Obsidian that automatically downloads note attachments via Git LFS.
 ## Usage
 
 1. Create a Git repository in your note directory.  
-   Place your attachment files in the `attachments` folder and use **Git LFS** to track the directory.
+   Use **Git LFS** to track the attachment directory.
 
 2. Run the server script:
 
