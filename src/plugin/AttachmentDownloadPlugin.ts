@@ -87,7 +87,6 @@ class Session {
 }
 
 export default class MeidaDownloaderPlugin extends Plugin {
-    private _onFileOpen: ((file: TFile | null) => any)
     private _session: Session | null = null
     private _timer: number | null = null
     settings: AttachmentDownloadPluginSettings;
@@ -108,9 +107,12 @@ export default class MeidaDownloaderPlugin extends Plugin {
                 return false;
             },
         })
-        this._onFileOpen = file => {
+        this.registerEvent(this.app.workspace.on("file-open",  file => {
+            if (plugin._session != null) {
+                plugin._session.destroy()
+                plugin._session = null
+            }
             if (file === null) return
-            plugin._session?.destroy()
             plugin._session = new Session(plugin, file)
             let lastEntryCount = 0
             if (plugin._timer)
@@ -130,8 +132,7 @@ export default class MeidaDownloaderPlugin extends Plugin {
                         plugin._timer = null
                     }
                 }, 1000)
-        }
-        this.app.workspace.on("file-open", this._onFileOpen)
+        }))
         this.registerMarkdownPostProcessor((e) => {
             plugin._session?.observer?.observe(e, {
                 childList: true,
@@ -144,7 +145,6 @@ export default class MeidaDownloaderPlugin extends Plugin {
     onunload() {
         this._session?.destroy()
         this._session = null
-        this.app.workspace.off("file-open", this._onFileOpen!)
     }
 
     async loadSettings() {
