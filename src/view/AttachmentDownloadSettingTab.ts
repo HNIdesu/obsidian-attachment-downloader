@@ -1,7 +1,7 @@
-import MeidaDownloaderPlugin from './main';
+import MeidaDownloaderPlugin from '../plugin/AttachmentDownloadPlugin';
 import { App, PluginSettingTab, Setting } from 'obsidian';
 
-export class MySettingTab extends PluginSettingTab {
+export default class AttachmentDownloadSettingTab extends PluginSettingTab {
     plugin: MeidaDownloaderPlugin;
 
     constructor(app: App, plugin: MeidaDownloaderPlugin) {

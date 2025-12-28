@@ -1,19 +1,13 @@
-import { MarkdownView, Platform, Plugin, TFile } from 'obsidian';
-import { MySettingTab } from './settings'
-interface MyPluginSettings {
-    hostName: string
-    port: number
-    batchSize: number
-    downloadMode: string
-}
-class MediaEntry {
-    element: Element
+import { MarkdownView, Plugin, TFile } from 'obsidian';
+import { AttachmentDownloadPluginSettings, DEFAULT_SETTINGS } from 'settings';
+import MediaUrl from '../util/MediaUrl';
+import AttachmentDownloadSettingTab from '../view/AttachmentDownloadSettingTab';
+
+type MediaEntry = {
+    element: Element,
     url: MediaUrl
-    constructor(element: Element, url: MediaUrl) {
-        this.element = element
-        this.url = url
-    }
 }
+
 class Session {
     file: TFile
     abortController: AbortController
@@ -41,7 +35,10 @@ class Session {
                         } catch (ex) {
                             continue
                         }
-                        mediaList.push(new MediaEntry((node as Element), url))
+                        mediaList.push({
+                            "element": node as Element,
+                            url
+                        })
                     }
                 }
             }
@@ -89,53 +86,11 @@ class Session {
     }
 }
 
-const DEFAULT_SETTINGS: Partial<MyPluginSettings> = {
-    hostName: "127.0.0.1",
-    port: 3322,
-    batchSize: 5,
-    downloadMode: "auto"
-}
-
-class MediaUrl {
-    hostname: string
-    protocol: string
-    vaultDirectory: string
-    mediaPath: string
-    lastModifiedTime: number
-    hash: string
-    private constructor() { }
-    static parse(urlStr: string | undefined | null, vaultDirectory: string): MediaUrl {
-        const result = new MediaUrl()
-        const url = new URL(urlStr!)
-        result.protocol = url.protocol
-        result.hostname = url.hostname
-        result.vaultDirectory = vaultDirectory
-        if (Platform.isMobileApp) {
-            const regex = new RegExp(`/_capacitor_file_${vaultDirectory}/(.+)`, "g")
-            const matchResult = regex.exec(url.pathname)
-            result.mediaPath = decodeURIComponent(matchResult![1])
-            result.lastModifiedTime = 0
-        } else {
-            const regex = new RegExp(`/${vaultDirectory}/(.+)`, "g")
-            const matchResult = regex.exec(url.pathname)
-            result.mediaPath = decodeURIComponent(matchResult![1])
-            result.lastModifiedTime = parseInt(url.search.substring(1))
-        }
-        result.hash = url.hash
-        return result
-    }
-    toString() {
-        return Platform.isMobileApp ?
-            `${this.protocol}//${this.hostname}/_capacitor_file_${this.vaultDirectory}/${encodeURIComponent(this.mediaPath)}?${this.lastModifiedTime}${this.hash}` :
-            `${this.protocol}//${this.hostname}/${this.vaultDirectory}/${encodeURIComponent(this.mediaPath)}?${this.lastModifiedTime}${this.hash}`
-    }
-}
-
 export default class MeidaDownloaderPlugin extends Plugin {
     private _onFileOpen: ((file: TFile | null) => any)
     private _session: Session | null = null
     private _timer: NodeJS.Timer | null = null
-    settings: MyPluginSettings;
+    settings: AttachmentDownloadPluginSettings;
     async onload() {
         const plugin: MeidaDownloaderPlugin = this
         this.addCommand({
@@ -184,7 +139,7 @@ export default class MeidaDownloaderPlugin extends Plugin {
             })
         });
         await this.loadSettings()
-        this.addSettingTab(new MySettingTab(this.app, this))
+        this.addSettingTab(new AttachmentDownloadSettingTab(this.app, this))
     }
     onunload() {
         this._session?.destroy()
