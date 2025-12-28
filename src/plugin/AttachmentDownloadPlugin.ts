@@ -1,7 +1,8 @@
-import { MarkdownView, Plugin, TFile } from 'obsidian';
+import { MarkdownView, Notice, Plugin, TFile } from 'obsidian';
 import { AttachmentDownloadPluginSettings, DEFAULT_SETTINGS } from 'settings';
 import MediaUrl from '../util/MediaUrl';
 import AttachmentDownloadSettingTab from '../view/AttachmentDownloadSettingTab';
+import ProgressNotice from '../components/ProgressNotice';
 
 type MediaEntry = {
     element: Element,
@@ -52,6 +53,10 @@ class Session {
         const mediaList = this.mediaList
         if (mediaList.length == 0) return
         this.isLoading = true
+        const loadingProgressNotice = new ProgressNotice()
+        loadingProgressNotice.text = "Loading attachments..."
+        loadingProgressNotice.progress = 0
+        let loadedAttachmentCount = 0
         for (let i = 0; i < mediaList.length; i += batchSize) {
             const mediaListChunk = mediaList.slice(i, i + batchSize)
             await fetch(`http://${this.plugin.settings.hostName}:${this.plugin.settings.port}/pull-lfs`, {
@@ -73,12 +78,19 @@ class Session {
                     }
                 }
             }).catch(err => {
-                if (err.name === "AbortError")
+                if (err.name === "AbortError"){
+                    loadingProgressNotice.close()
+                    this.isLoading = false
+                    new Notice("Attachment loading aborted.",500)
                     throw err
+                }
                 console.error(err)
             })
+            loadedAttachmentCount += mediaListChunk.length
+            loadingProgressNotice.progress = loadedAttachmentCount / mediaList.length
         }
         this.isLoading = false
+        loadingProgressNotice.close()
     }
     destroy() {
         this.observer.disconnect()
