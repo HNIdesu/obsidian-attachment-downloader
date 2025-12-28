@@ -89,7 +89,7 @@ class Session {
 export default class MeidaDownloaderPlugin extends Plugin {
     private _onFileOpen: ((file: TFile | null) => any)
     private _session: Session | null = null
-    private _timer: NodeJS.Timer | null = null
+    private _timer: number | null = null
     settings: AttachmentDownloadPluginSettings;
     async onload() {
         const plugin: MeidaDownloaderPlugin = this
@@ -116,7 +116,7 @@ export default class MeidaDownloaderPlugin extends Plugin {
             if (plugin._timer)
                 clearInterval(plugin._timer)
             if (plugin.settings.downloadMode == "auto")
-                plugin._timer = setInterval(() => {
+                plugin._timer = window.setInterval(() => {
                     const length = plugin._session?.mediaList.length
                     if (length !== undefined) {
                         if (length <= lastEntryCount) {
