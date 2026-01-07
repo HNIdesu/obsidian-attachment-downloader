@@ -1,5 +1,4 @@
 import os
-from queue import Queue
 from argparse import ArgumentParser
 import os.path as p
 import json
@@ -111,6 +110,37 @@ class MyHandler(BaseHTTPRequestHandler):
             self.end_headers()
             if result:
                 self.wfile.write(json.dumps(result).encode("utf-8"))
+        elif self.path == "/status-lfs":
+            content_length = int(self.headers.get('Content-Length', 0))
+            user_agent = self.headers.get('User-Agent', "")
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode(encoding="utf-8"))
+            logger.debug(f"Request body parsed, resources: {data['resources']}")
+            def is_lfs_pointer(path: str):
+                try:
+                    version_line = b"version https://git-lfs.github.com/spec/v1\n"
+                    with open(path,"rb") as br:
+                        return br.read(len(version_line)) == version_line
+                except OSError:
+                    return False
+            response_data = dict()
+            for resource in data["resources"]:
+                resource_path = p.join(note_directory,resource)
+                resource_status = "none"
+                if p.exists(resource_path):
+                    resource_status = "pointer-file" if is_lfs_pointer(resource_path) else "file"
+                response_data[resource] = resource_status
+            self.send_response(200)
+            if "Android" in user_agent:
+                self.send_header('Access-Control-Allow-Origin', 'http://localhost') # Mobile
+            else:
+                self.send_header("Access-Control-Allow-Origin","app://obsidian.md") # Desktop
+            self.send_header("Access-Control-Allow-Methods","POST")
+            self.send_header("Access-Control-Allow-Headers","*")
+            self.send_header("Content-Type","application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(response_data).encode("utf-8"))
+            
     def do_OPTIONS(self):
         self.send_response(204)
         user_agent = self.headers.get('User-Agent', "")
