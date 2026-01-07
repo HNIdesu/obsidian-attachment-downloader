@@ -129,21 +129,22 @@ export default class MeidaDownloaderPlugin extends Plugin {
             let lastEntryCount = 0
             if (plugin._timer)
                 clearInterval(plugin._timer)
-            if (plugin.settings.downloadMode == "auto")
-                plugin._timer = window.setInterval(() => {
-                    const length = plugin._session?.mediaList.length
-                    if (length !== undefined) {
-                        if (length <= lastEntryCount) {
-                            clearInterval(plugin._timer!)
-                            plugin._timer = null
-                            plugin._session?.loadMedia(plugin.settings.batchSize)
-                        } else
-                            lastEntryCount = length
-                    } else {
+            plugin._timer = window.setInterval(() => {
+                const length = plugin._session?.mediaList.length
+                if (length !== undefined) {
+                    if (length <= lastEntryCount) {
                         clearInterval(plugin._timer!)
                         plugin._timer = null
-                    }
-                }, 1000)
+                        if (plugin.settings.downloadMode === "auto")
+                            plugin._session?.loadMedia(plugin.settings.batchSize)
+                    } else
+                        lastEntryCount = length
+                } else {
+                    clearInterval(plugin._timer!)
+                    plugin._timer = null
+                }
+            }, 1000)
+            
         }))
         this.registerMarkdownPostProcessor((e) => {
             plugin._session?.observer?.observe(e, {
