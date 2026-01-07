@@ -51,7 +51,7 @@ class Session {
             return
         }
         const mediaList = this.mediaList
-        if (mediaList.length == 0) return
+        if (mediaList.length === 0) return
         this.isLoading = true
         const loadingProgressNotice = new ProgressNotice()
         loadingProgressNotice.text = "Loading attachments..."
@@ -72,7 +72,7 @@ class Session {
                 for (let i = 0; i < mediaListChunk.length; i++) {
                     const lastModifiedTime = json[i] as number
                     const entry = mediaListChunk[i]
-                    if (lastModifiedTime != entry.url.lastModifiedTime) {
+                    if (lastModifiedTime !== entry.url.lastModifiedTime) {
                         entry.url.lastModifiedTime = lastModifiedTime;
                         entry.element.setAttribute("src", entry.url.toString())
                     }
@@ -120,7 +120,7 @@ export default class MeidaDownloaderPlugin extends Plugin {
             },
         })
         this.registerEvent(this.app.workspace.on("file-open",  file => {
-            if (plugin._session != null) {
+            if (plugin._session !== null) {
                 plugin._session.destroy()
                 plugin._session = null
             }
