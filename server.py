@@ -98,6 +98,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 logger.debug(f"Successfully fetched resources, sending 200 response")
                 self.send_response(200)
             else:
+                result = None
                 logger.error(f"git lfs pull failed with code {retcode}, sending 500 response")
                 self.send_response(500)
             if "Android" in user_agent:
@@ -108,7 +109,7 @@ class MyHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Headers","*")
             self.send_header("Content-Type","application/json")
             self.end_headers()
-            if retcode == 0:
+            if result:
                 self.wfile.write(json.dumps(result).encode("utf-8"))
     def do_OPTIONS(self):
         self.send_response(204)
