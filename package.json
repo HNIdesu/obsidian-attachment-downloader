@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-attachment-downloader",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Automatically download note attachments via Git LFS.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
