@@ -2,7 +2,7 @@ import { MarkdownView, Notice, Plugin, TFile } from 'obsidian';
 import { AttachmentDownloadPluginSettings, DEFAULT_SETTINGS } from 'settings';
 import MediaUrl from '../util/MediaUrl';
 import AttachmentDownloadSettingTab from '../view/AttachmentDownloadSettingTab';
-import ProgressNotice from '../components/ProgressNotice';
+import ProgressNotice from '../components/common/ProgressNotice';
 
 type MediaEntry = {
     element: Element,
