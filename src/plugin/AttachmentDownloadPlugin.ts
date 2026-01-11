@@ -105,6 +105,10 @@ class Session {
         let loadedAttachmentCount = 0
         for (let i = 0; i < mediaList.length; i += batchSize) {
             const mediaListChunk = mediaList.slice(i, i + batchSize)
+            mediaListChunk.forEach(it=>{
+                if (it.downloadCard)
+                    it.downloadCard.state = "downloading"
+            })
             await fetch(`http://${this.plugin.settings.hostName}:${this.plugin.settings.port}/pull-lfs`, {
                 method: "POST",
                 headers: {
@@ -122,6 +126,7 @@ class Session {
                         entry.url.lastModifiedTime = lastModifiedTime;
                         entry.element.setAttribute("src", entry.url.toString())
                     }
+                    entry.downloadCard?.markAsCompleted()
                 }
             }).catch(err => {
                 if (err.name === "AbortError"){
@@ -131,6 +136,10 @@ class Session {
                     throw err
                 }
                 console.error(err)
+                mediaListChunk.forEach(it=>{
+                if (it.downloadCard)
+                    it.downloadCard.state = "failed"
+                })
             })
             loadedAttachmentCount += mediaListChunk.length
             loadingProgressNotice.progress = loadedAttachmentCount / mediaList.length
@@ -181,9 +190,10 @@ export default class MeidaDownloaderPlugin extends Plugin {
                     if (length <= lastEntryCount) {
                         clearInterval(plugin._timer!)
                         plugin._timer = null
-                        if (plugin.settings.downloadMode === "auto")
-                            plugin._session?.loadMedia(plugin.settings.batchSize)
-                        plugin._session?.setupLfsDownloadUI()
+                        plugin._session?.setupLfsDownloadUI().then(()=>{
+                            if (plugin.settings.downloadMode === "auto")
+                                plugin._session?.loadMedia(plugin.settings.batchSize)
+                        })
                     } else
                         lastEntryCount = length
                 } else {
