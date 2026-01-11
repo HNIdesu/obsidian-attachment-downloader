@@ -15,7 +15,7 @@ If your plugin does not need CSS, delete this file.
 	color: #888;
 }
 
-.attachment-download__area {
+.attachment-download__card {
 	padding: 12px 14px;
 	margin: 8px 0;
 	border: 1px solid var(--background-modifier-border);

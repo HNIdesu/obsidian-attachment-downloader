@@ -3,10 +3,12 @@ import { AttachmentDownloadPluginSettings, DEFAULT_SETTINGS } from 'settings';
 import MediaUrl from '../util/MediaUrl';
 import AttachmentDownloadSettingTab from '../view/AttachmentDownloadSettingTab';
 import ProgressNotice from '../components/common/ProgressNotice';
+import { AttachmentDownloadCard } from 'components/download/AttachmentDownloadCard';
 
 type MediaEntry = {
     element: Element,
-    url: MediaUrl
+    url: MediaUrl,
+    downloadCard: AttachmentDownloadCard | null
 }
 
 class Session {
@@ -38,7 +40,8 @@ class Session {
                         }
                         mediaList.push({
                             "element": node as Element,
-                            url
+                            url,
+                            downloadCard: null
                         })
                     }
                 }
@@ -59,24 +62,8 @@ class Session {
         this.mediaList.filter(it=>attachmentStatus[it.url.mediaPath] === "pointer-file").forEach(it=>{
             it.element.addClass("hidden")
             const containerEl = it.element.parentElement!
-            const downloadArea = it.element.createDiv({
-                cls: "attachment-download__area"
-            })
-            const titleElement = downloadArea.createEl("div",{
-                text: `This attachment is not stored locally. Click below to download "${it.url.mediaPath}".`,
-                cls: "attachment-download__title"
-            })
-            const btnElement = downloadArea.createEl("button",{
-                text: "Download Attachment",
-                cls: "attachment-download__button"
-            })
-            downloadArea.appendChild(titleElement)
-            downloadArea.appendChild(btnElement)
-            btnElement.addEventListener("click",async ()=>{
-                btnElement.setText("Downloading...")
-                btnElement.disabled = true
-                try{
-                    const json = await fetch(`http://${this.plugin.settings.hostName}:${this.plugin.settings.port}/pull-lfs`, {
+            const downloadCard = new AttachmentDownloadCard(it,async ()=>{
+                const json = await fetch(`http://${this.plugin.settings.hostName}:${this.plugin.settings.port}/pull-lfs`, {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
@@ -86,20 +73,22 @@ class Session {
                         }),
                         signal: this.abortController.signal
                     }).then(res => res.json())
-                    const lastModifiedTime = json[0] as number
-                    if (lastModifiedTime !== it.url.lastModifiedTime) {
-                        it.url.lastModifiedTime = lastModifiedTime;
-                        it.element.setAttribute("src", it.url.toString())
-                    }
-                    it.element.removeClass("hidden")
-                    downloadArea.remove()
-                }catch(err) {
-                    console.error(err)
-                    btnElement.setText("Download failed. Click to retry.")
-                    btnElement.disabled = false
+                const lastModifiedTime = json[0] as number
+                if (lastModifiedTime !== it.url.lastModifiedTime) {
+                    it.url.lastModifiedTime = lastModifiedTime;
+                    it.element.setAttribute("src", it.url.toString())
                 }
             })
-            containerEl.appendChild(downloadArea)
+            downloadCard.render(containerEl)
+            downloadCard.title = it.url.mediaPath
+            downloadCard.onDownloadCompleted = ()=>{
+                it.element.removeClass("hidden")
+                downloadCard.remove()
+            }
+            downloadCard.onDownloadFailed = (_,err)=>{
+                console.error(err)
+            }
+            it.downloadCard = downloadCard
         })
     }
     async loadMedia(batchSize:number) {
