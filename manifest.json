@@ -1,7 +1,7 @@
 {
 	"id": "attachment-downloader",
 	"name": "Attachment Downloader",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"minAppVersion": "0.15.0",
 	"description": "Automatically download note attachments via Git LFS.",
 	"author": "HNIdesu",
