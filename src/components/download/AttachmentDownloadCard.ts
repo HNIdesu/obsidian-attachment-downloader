@@ -88,13 +88,10 @@ export class AttachmentDownloadCard {
 			text: "Download Attachment",
 			cls: "attachment-download__button",
 		});
-		downloadCard.appendChild(titleElement);
-		downloadCard.appendChild(btnElement);
 		this._cardElement = downloadCard;
 		this._titleElement = titleElement;
 		this._downloadBtnElement = btnElement;
 		btnElement.addEventListener("click", this.download.bind(this));
-		containerEl.appendChild(downloadCard);
 	}
 
 	remove() {
