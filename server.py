@@ -41,7 +41,7 @@ parser.add_argument("--verbose", action="store_true",default=False,required=Fals
 args = parser.parse_args()
 note_directory = p.abspath(args.note_directory)
 
-class MyHandler(BaseHTTPRequestHandler):
+class AttachmentDownloadHandler(BaseHTTPRequestHandler):
     def is_client_disconnected(self):
         sock = self.connection
         try:
@@ -155,7 +155,7 @@ class MyHandler(BaseHTTPRequestHandler):
 logger = Logger(verbose=args.verbose)
 server = HTTPServer(
     server_address=(args.bind_address, args.port),
-    RequestHandlerClass=MyHandler
+    RequestHandlerClass=AttachmentDownloadHandler
 )
 
 logger.log(f"Listening on {args.bind_address}:{args.port}...")
