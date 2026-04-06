@@ -1,3 +1,4 @@
+from collections import defaultdict
 import os
 from argparse import ArgumentParser
 from pathlib import Path
@@ -32,6 +33,26 @@ class Logger:
         if self.verbose:
             print(f"{self._prefix('DEBUG')} {colorama.Fore.GREEN}{message}")
 
+cached_git_root = dict[str,str]()
+def find_git_root(path: Path) -> str:
+    parent_dir = str(path.parent)
+    if parent_dir in cached_git_root:
+        return cached_git_root[parent_dir]
+    proc = subprocess.run(
+        args=[
+            "git",
+            "rev-parse",
+            "--show-toplevel"
+        ],
+        cwd=parent_dir,
+        check=True,
+        stdout=subprocess.PIPE
+    )
+    git_root = proc.stdout.decode().strip()
+    cached_git_root[parent_dir] = git_root
+    assert(git_root != "")
+    return git_root
+
 parser = ArgumentParser()
 parser.add_argument("note_directory", type=str)
 parser.add_argument("--bind-address", default="127.0.0.1", type=str, required=False)
@@ -64,8 +85,17 @@ class AttachmentDownloadHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode(encoding="utf-8"))
             logger.debug(f"Request body parsed, resources: {data['resources']}")
+            groups_by_git_root = defaultdict(list)
+            for resource in data['resources']:
+                resouce_path = note_directory / resource
+                git_root = find_git_root(resouce_path)
+                groups_by_git_root[git_root].append(str(resouce_path.relative_to(git_root)))
+            # Only one group can be handled in a request
+            assert(len(groups_by_git_root) == 1)
+            git_root, resources = next(iter(groups_by_git_root.items()))
+            logger.debug(f"Git root found: {git_root}, resources to pull: {resources}")
             args1 = [
-                "git","lfs","pull","--include",",".join(data["resources"])
+                "git","lfs","pull","--include",",".join(resources)
             ]
             if args.dry_run:
                 args1.insert(0, "echo")
@@ -74,7 +104,7 @@ class AttachmentDownloadHandler(BaseHTTPRequestHandler):
                 logger.debug(f"Running command: {' '.join(args1)}")
             proc = subprocess.Popen(
                 args=args1,
-                cwd=note_directory
+                cwd=git_root
             )
             try:
                 while True:
