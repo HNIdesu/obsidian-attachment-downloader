@@ -1,6 +1,6 @@
 import os
 from argparse import ArgumentParser
-import os.path as p
+from pathlib import Path
 import json
 import socket
 import subprocess
@@ -39,7 +39,7 @@ parser.add_argument("--port", default=3322, type=int, required=False)
 parser.add_argument("--dry-run", action="store_true",default=False,required=False)
 parser.add_argument("--verbose", action="store_true",default=False,required=False)
 args = parser.parse_args()
-note_directory = p.abspath(args.note_directory)
+note_directory = Path(args.note_directory).absolute()
 
 class AttachmentDownloadHandler(BaseHTTPRequestHandler):
     def is_client_disconnected(self):
@@ -93,7 +93,7 @@ class AttachmentDownloadHandler(BaseHTTPRequestHandler):
                     proc.terminate()
                     proc.wait()
             if retcode == 0:
-                result = [(os.stat(p.join(note_directory, resource_path)).st_mtime_ns // 1000000) for resource_path in data["resources"]]
+                result = [(os.stat(note_directory /resource_path).st_mtime_ns // 1000000) for resource_path in data["resources"]]
                 logger.debug(f"Successfully fetched resources, sending 200 response")
                 self.send_response(200)
             else:
@@ -116,7 +116,7 @@ class AttachmentDownloadHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode(encoding="utf-8"))
             logger.debug(f"Request body parsed, resources: {data['resources']}")
-            def is_lfs_pointer(path: str):
+            def is_lfs_pointer(path: Path):
                 try:
                     version_line = b"version https://git-lfs.github.com/spec/v1\n"
                     with open(path,"rb") as br:
@@ -125,9 +125,9 @@ class AttachmentDownloadHandler(BaseHTTPRequestHandler):
                     return False
             response_data = dict()
             for resource in data["resources"]:
-                resource_path = p.join(note_directory,resource)
+                resource_path: Path = note_directory / resource
                 resource_status = "none"
-                if p.exists(resource_path):
+                if resource_path.exists():
                     resource_status = "pointer-file" if is_lfs_pointer(resource_path) else "file"
                 response_data[resource] = resource_status
             self.send_response(200)
